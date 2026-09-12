@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow — Kubernetes Practice App</title>
+  <meta name="description" content="Full-stack Task Manager for Kubernetes practice — featuring pods, deployments, services, and more." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Background Blobs ─────────────────────────────────────────────── -->
+<div class="bg-blobs" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<!-- ── Header ──────────────────────────────────────────────────────── -->
+<header class="header glass">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-icon">⚡</span>
+      <span class="brand-name">TaskFlow</span>
+      <span class="brand-badge">K8s Demo</span>
+    </div>
+    <div class="server-info" id="serverInfo">
+      <span class="dot dot--pulsing"></span>
+      <span id="hostLabel">Connecting…</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Main Layout ──────────────────────────────────────────────────── -->
+<main class="layout">
+
+  <!-- Stats Row -->
+  <section class="stats-row" id="statsRow" aria-label="Task statistics">
+    <div class="stat-card glass" id="statTotal">
+      <div class="stat-value" id="statTotalVal">—</div>
+      <div class="stat-label">Total Tasks</div>
+    </div>
+    <div class="stat-card glass" id="statTodo">
+      <div class="stat-value" id="statTodoVal">—</div>
+      <div class="stat-label">To Do</div>
+    </div>
+    <div class="stat-card glass" id="statProgress">
+      <div class="stat-value" id="statProgressVal">—</div>
+      <div class="stat-label">In Progress</div>
+    </div>
+    <div class="stat-card glass" id="statDone">
+      <div class="stat-value" id="statDoneVal">—</div>
+      <div class="stat-label">Done</div>
+    </div>
+    <div class="stat-card glass" id="statHigh">
+      <div class="stat-value stat-value--red" id="statHighVal">—</div>
+      <div class="stat-label">High Priority</div>
+    </div>
+  </section>
+
+  <!-- Content Grid -->
+  <div class="content-grid">
+
+    <!-- ── Create Task Panel ─────────────────────────────────────── -->
+    <aside class="panel glass" id="createPanel">
+      <h2 class="panel-title">
+        <span class="panel-icon">✦</span> New Task
+      </h2>
+      <form id="taskForm" novalidate>
+        <div class="form-group">
+          <label for="taskTitle" class="form-label">Title <span class="required">*</span></label>
+          <input type="text" id="taskTitle" class="form-input" placeholder="What needs to be done?" required />
+        </div>
+        <div class="form-group">
+          <label for="taskDesc" class="form-label">Description</label>
+          <textarea id="taskDesc" class="form-input form-textarea" placeholder="Optional details…"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="taskStatus" class="form-label">Status</label>
+            <select id="taskStatus" class="form-input form-select">
+              <option value="todo">📋 To Do</option>
+              <option value="in_progress">🔄 In Progress</option>
+              <option value="done">✅ Done</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="taskPriority" class="form-label">Priority</label>
+            <select id="taskPriority" class="form-input form-select">
+              <option value="low">🟢 Low</option>
+              <option value="medium" selected>🟡 Medium</option>
+              <option value="high">🔴 High</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          <span class="btn-text">Create Task</span>
+          <span class="btn-spinner" hidden>⏳</span>
+        </button>
+      </form>
+
+      <!-- API Info Box -->
+      <div class="api-box glass-inner">
+        <div class="api-box-title">
+          <span>🔌</span> API Endpoint
+        </div>
+        <code id="apiEndpoint" class="api-url">http://localhost:3001</code>
+        <div class="api-source" id="apiSource">source: —</div>
+      </div>
+    </aside>
+
+    <!-- ── Task List Panel ───────────────────────────────────────── -->
+    <section class="panel glass" id="taskListPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span class="panel-icon">📋</span> Tasks
+        </h2>
+        <div class="filter-bar">
+          <button class="filter-btn active" data-filter="all" id="filterAll">All</button>
+          <button class="filter-btn" data-filter="todo" id="filterTodo">To Do</button>
+          <button class="filter-btn" data-filter="in_progress" id="filterProgress">In Progress</button>
+          <button class="filter-btn" data-filter="done" id="filterDone">Done</button>
+        </div>
+        <button class="btn btn-ghost" id="refreshBtn" title="Refresh tasks">↻ Refresh</button>
+      </div>
+
+      <div id="taskList" class="task-list">
+        <div class="empty-state">
+          <div class="empty-icon">🚀</div>
+          <div class="empty-text">Loading tasks…</div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /content-grid -->
+
+  <!-- ── K8s Debug Panel ─────────────────────────────────────────── -->
+  <section class="panel glass k8s-panel" id="k8sPanel">
+    <h2 class="panel-title">
+      <span class="panel-icon">☸</span> Kubernetes Debug Info
+    </h2>
+    <div class="k8s-grid" id="k8sGrid">
+      <div class="k8s-item">
+        <div class="k8s-key">Frontend Pod</div>
+        <code class="k8s-val" id="frontendPod">—</code>
+      </div>
+      <div class="k8s-item">
+        <div class="k8s-key">Backend Pod</div>
+        <code class="k8s-val" id="backendPod">—</code>
+      </div>
+      <div class="k8s-item">
+        <div class="k8s-key">DB Status</div>
+        <code class="k8s-val" id="dbStatus">—</code>
+      </div>
+      <div class="k8s-item">
+        <div class="k8s-key">Redis Status</div>
+        <code class="k8s-val" id="redisStatus">—</code>
+      </div>
+      <div class="k8s-item">
+        <div class="k8s-key">API Version</div>
+        <code class="k8s-val" id="apiVersion">—</code>
+      </div>
+      <div class="k8s-item">
+        <div class="k8s-key">Cache Source</div>
+        <code class="k8s-val" id="cacheSource">—</code>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Edit Modal ───────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="editModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+  <div class="modal glass">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Edit Task</h3>
+      <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+    </div>
+    <form id="editForm">
+      <input type="hidden" id="editId" />
+      <div class="form-group">
+        <label for="editTitle" class="form-label">Title</label>
+        <input type="text" id="editTitle" class="form-input" />
+      </div>
+      <div class="form-group">
+        <label for="editDesc" class="form-label">Description</label>
+        <textarea id="editDesc" class="form-input form-textarea"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editStatus" class="form-label">Status</label>
+          <select id="editStatus" class="form-input form-select">
+            <option value="todo">📋 To Do</option>
+            <option value="in_progress">🔄 In Progress</option>
+            <option value="done">✅ Done</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editPriority" class="form-label">Priority</label>
+          <select id="editPriority" class="form-input form-select">
+            <option value="low">🟢 Low</option>
+            <option value="medium">🟡 Medium</option>
+            <option value="high">🔴 High</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelEdit">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Toast ────────────────────────────────────────────────────────── -->
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

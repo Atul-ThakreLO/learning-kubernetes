@@ -1,0 +1,25 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  CONFIGMAP — Non-secret configuration
+#  Best practice: put env vars here, secrets in Secret objects.
+#  Practice: kubectl describe configmap app-config -n taskflow
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: taskflow
+  labels:
+    app: taskflow
+data:
+  # PostgreSQL config
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "taskdb"
+
+  # Redis config
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+
+  # Backend config
+  PORT: "3001"
+  NODE_ENV: "production"

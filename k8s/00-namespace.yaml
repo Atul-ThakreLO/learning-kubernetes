@@ -1,0 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  NAMESPACE
+#  Isolates all TaskFlow resources into a dedicated namespace.
+#  Practice: kubectl get all -n taskflow
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: taskflow
+  labels:
+    app: taskflow
+    environment: practice

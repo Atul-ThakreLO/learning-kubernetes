@@ -1,0 +1,69 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  STANDALONE POD EXAMPLES
+#  These demonstrate raw Pods (without Deployments) for learning purposes.
+#  In practice, always use Deployments — Pods alone won't be restarted if they fail.
+#
+#  Practice commands:
+#    kubectl apply -f 08-standalone-pod.yaml -n taskflow
+#    kubectl get pod debug-pod -n taskflow
+#    kubectl describe pod debug-pod -n taskflow
+#    kubectl logs debug-pod -n taskflow
+#    kubectl exec -it debug-pod -n taskflow -- sh
+#    kubectl delete pod debug-pod -n taskflow   ← it won't be recreated!
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-pod
+  namespace: taskflow
+  labels:
+    app: debug
+    purpose: practice
+spec:
+  containers:
+    - name: debug
+      image: alpine:latest
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c", "while true; do echo 'Debug pod running at '$(date); sleep 10; done"]
+      resources:
+        requests:
+          cpu: "10m"
+          memory: "16Mi"
+        limits:
+          cpu: "50m"
+          memory: "32Mi"
+  restartPolicy: Always
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+#  NETWORK TEST POD
+#  Use this to test connectivity between services from inside the cluster.
+#
+#  kubectl exec -it nettest-pod -n taskflow -- sh
+#  # Then run:
+#  wget -qO- http://backend-service:3001/health
+#  wget -qO- http://frontend-service:80
+#  ping postgres-service
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nettest-pod
+  namespace: taskflow
+  labels:
+    app: nettest
+    purpose: practice
+spec:
+  containers:
+    - name: nettest
+      image: nicolaka/netshoot
+      imagePullPolicy: IfNotPresent
+      command: ["sleep", "3600"]
+      resources:
+        requests:
+          cpu: "10m"
+          memory: "32Mi"
+        limits:
+          cpu: "100m"
+          memory: "128Mi"
+  restartPolicy: Never

@@ -1,0 +1,127 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  POSTGRESQL DEPLOYMENT
+#
+#  Key concepts practiced here:
+#  - Deployment (manages ReplicaSet → manages Pods)
+#  - envFrom: loads ALL keys from ConfigMap and Secret as env vars
+#  - Volume mounts for persistent data
+#  - Resource requests/limits
+#  - Liveness and Readiness probes
+#
+#  Practice commands:
+#    kubectl get deployment postgres-deployment -n taskflow
+#    kubectl describe deployment postgres-deployment -n taskflow
+#    kubectl get replicaset -n taskflow
+#    kubectl get pods -n taskflow -l app=postgres
+#    kubectl logs -f <pod-name> -n taskflow
+#    kubectl exec -it <pod-name> -n taskflow -- psql -U postgres -d taskdb
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  namespace: taskflow
+  labels:
+    app: postgres
+    tier: database
+spec:
+  replicas: 1                   # DB should have 1 replica (for practice; use StatefulSet in prod)
+  selector:
+    matchLabels:
+      app: postgres             # Must match pod template labels below
+  strategy:
+    type: Recreate              # Stop old pod before starting new (safe for single-replica DB)
+  template:
+    metadata:
+      labels:
+        app: postgres
+        tier: database
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 5432
+              name: postgres
+
+          env:
+            # Load from ConfigMap
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DB_NAME
+            # Load from Secret
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_PASSWORD
+
+          resources:
+            requests:
+              cpu:    "100m"    # 0.1 CPU core minimum
+              memory: "128Mi"
+            limits:
+              cpu:    "500m"    # Max 0.5 CPU core
+              memory: "512Mi"
+
+          # Readiness probe: only send traffic when DB is ready to accept connections
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "taskdb"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 5
+
+          # Liveness probe: restart container if DB is unresponsive
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata                   # subPath prevents permission issues
+
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+#  POSTGRESQL SERVICE — ClusterIP (internal-only)
+#  Other pods reach postgres at: postgres-service:5432
+#
+#  Practice:
+#    kubectl get svc postgres-service -n taskflow
+#    kubectl describe svc postgres-service -n taskflow
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: taskflow
+  labels:
+    app: postgres
+    tier: database
+spec:
+  type: ClusterIP               # Accessible only within the cluster
+  selector:
+    app: postgres               # Routes traffic to pods with this label
+  ports:
+    - name: postgres
+      port: 5432                # Port exposed by the service
+      targetPort: 5432          # Port on the container
+      protocol: TCP

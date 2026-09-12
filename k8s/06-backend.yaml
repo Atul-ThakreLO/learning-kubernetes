@@ -1,0 +1,127 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  BACKEND DEPLOYMENT
+#
+#  Key concepts practiced here:
+#  - Multiple replicas (3) — observe load balancing
+#  - envFrom: inject all ConfigMap keys at once
+#  - envFrom: inject all Secret keys at once
+#  - Liveness, Readiness, and Startup probes
+#  - Rolling update strategy (zero-downtime deploys)
+#
+#  Practice commands:
+#    kubectl get deployment backend-deployment -n taskflow
+#    kubectl scale deployment backend-deployment --replicas=5 -n taskflow
+#    kubectl rollout status deployment/backend-deployment -n taskflow
+#    kubectl rollout history deployment/backend-deployment -n taskflow
+#    kubectl rollout undo deployment/backend-deployment -n taskflow
+#    kubectl set image deployment/backend-deployment backend=my-backend:v2 -n taskflow
+#
+#  Watch rolling update live:
+#    kubectl get pods -n taskflow -w
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: taskflow
+  labels:
+    app: backend
+    tier: api
+  annotations:
+    kubernetes.io/change-cause: "Initial deployment v1.0.0"   # shown in rollout history
+spec:
+  replicas: 3                             # 3 backend pods for load balancing practice
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                         # Can temporarily have 1 extra pod during update
+      maxUnavailable: 0                   # Never reduce below desired count (zero downtime)
+  template:
+    metadata:
+      labels:
+        app: backend
+        tier: api
+    spec:
+      # Wait for any terminating pod to finish in-flight requests
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: backend
+          image: taskflow-backend:latest
+          imagePullPolicy: IfNotPresent   # Use local image (for minikube / kind)
+
+          ports:
+            - containerPort: 3001
+              name: http
+
+          # Inject ALL keys from ConfigMap as env vars
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: db-secret
+
+          resources:
+            requests:
+              cpu:    "100m"
+              memory: "128Mi"
+            limits:
+              cpu:    "500m"
+              memory: "256Mi"
+
+          # Startup probe: gives the app time to connect to DB/Redis on boot
+          # (overrides liveness probe during startup period)
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            failureThreshold: 30          # 30 * 5s = 150s max startup time
+            periodSeconds: 5
+
+          # Readiness probe: remove pod from service endpoints if unhealthy
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # Liveness probe: restart container if stuck
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+#  BACKEND SERVICE — ClusterIP
+#  Internal pods + the frontend nginx proxy reach backend at: backend-service:3001
+#
+#  Practice:
+#    kubectl get endpoints backend-service -n taskflow  ← shows which pod IPs are behind it
+#    kubectl describe svc backend-service -n taskflow
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: taskflow
+  labels:
+    app: backend
+    tier: api
+spec:
+  type: ClusterIP
+  selector:
+    app: backend                # Selects ALL 3 backend pods — k8s load-balances between them
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3001
+      protocol: TCP

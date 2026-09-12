@@ -1,0 +1,82 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  STANDALONE REPLICASET EXAMPLE
+#  Demonstrates how a ReplicaSet maintains N replicas of a Pod.
+#  In practice, use Deployment (which creates a ReplicaSet automatically).
+#
+#  Practice commands:
+#    kubectl apply -f 09-replicaset.yaml -n taskflow
+#    kubectl get replicaset backend-rs -n taskflow
+#    kubectl describe replicaset backend-rs -n taskflow
+#
+#  Experiment 1: Kill a pod — RS recreates it
+#    kubectl get pods -n taskflow -l app=backend-rs
+#    kubectl delete pod <one-of-the-pods> -n taskflow
+#    kubectl get pods -n taskflow -l app=backend-rs -w   ← watch it respawn
+#
+#  Experiment 2: Scale manually
+#    kubectl scale replicaset backend-rs --replicas=5 -n taskflow
+#    kubectl scale replicaset backend-rs --replicas=1 -n taskflow
+#
+#  Experiment 3: Orphan pods by changing selector
+#    Change a pod's label: kubectl label pod <pod-name> app=orphan --overwrite -n taskflow
+#    RS will create a new pod to maintain replica count
+#    The "orphaned" pod will keep running unmanaged
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: backend-rs
+  namespace: taskflow
+  labels:
+    app: backend-rs
+    tier: api
+    purpose: practice
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend-rs           # RS owns pods with EXACTLY this label
+  template:
+    metadata:
+      labels:
+        app: backend-rs
+        tier: api
+    spec:
+      containers:
+        - name: backend
+          image: taskflow-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: db-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+#  SERVICE FOR REPLICASET (practice)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-rs-service
+  namespace: taskflow
+  labels:
+    app: backend-rs
+    purpose: practice
+spec:
+  type: ClusterIP
+  selector:
+    app: backend-rs
+  ports:
+    - port: 3001
+      targetPort: 3001
