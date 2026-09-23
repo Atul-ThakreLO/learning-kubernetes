@@ -1,5 +1,5 @@
 /* global state */
-const API_BASE = window.API_URL || 'http://localhost:3001';
+const API_BASE = window.API_URL || '';
 let currentFilter = 'all';
 let lastSource = '—';
 
@@ -16,11 +16,11 @@ function showToast(msg, type = 'info') {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function statusBadge(s) {
-  const map = { todo: ['badge-todo','📋 To Do'], in_progress: ['badge-progress','🔄 In Progress'], done: ['badge-done','✅ Done'] };
+  const map = { todo: ['badge-todo', '📋 To Do'], in_progress: ['badge-progress', '🔄 In Progress'], done: ['badge-done', '✅ Done'] };
   const [cls, label] = map[s] || ['badge-todo', s];
   return `<span class="badge ${cls}">${label}</span>`;
 }
@@ -44,16 +44,16 @@ async function apiFetch(path, opts = {}) {
 async function loadStats() {
   try {
     const { data, hostname } = await apiFetch('/api/stats');
-    $('statTotalVal').textContent    = data.total;
-    $('statTodoVal').textContent     = data.todo;
+    $('statTotalVal').textContent = data.total;
+    $('statTodoVal').textContent = data.todo;
     $('statProgressVal').textContent = data.in_progress;
-    $('statDoneVal').textContent     = data.done;
-    $('statHighVal').textContent     = data.high_priority;
-    $('backendPod').textContent      = hostname || '—';
-    $('hostLabel').textContent       = `Backend: ${hostname}`;
+    $('statDoneVal').textContent = data.done;
+    $('statHighVal').textContent = data.high_priority;
+    $('backendPod').textContent = hostname || '—';
+    $('hostLabel').textContent = `Backend: ${hostname}`;
   } catch (err) {
     console.error('Stats error:', err);
-    ['statTotalVal','statTodoVal','statProgressVal','statDoneVal','statHighVal'].forEach(id => $(id).textContent = '—');
+    ['statTotalVal', 'statTodoVal', 'statProgressVal', 'statDoneVal', 'statHighVal'].forEach(id => $(id).textContent = '—');
   }
 }
 
@@ -61,13 +61,13 @@ async function loadStats() {
 async function loadHealth() {
   try {
     const h = await apiFetch('/health');
-    $('dbStatus').textContent      = h.database || '—';
-    $('redisStatus').textContent   = h.redis    || '—';
-    $('apiVersion').textContent    = h.version  || '—';
-    $('apiEndpoint').textContent   = API_BASE;
-    $('frontendPod').textContent   = window.location.hostname;
+    $('dbStatus').textContent = h.database || '—';
+    $('redisStatus').textContent = h.redis || '—';
+    $('apiVersion').textContent = h.version || '—';
+    $('apiEndpoint').textContent = API_BASE;
+    $('frontendPod').textContent = window.location.hostname;
   } catch (err) {
-    $('dbStatus').textContent    = 'error';
+    $('dbStatus').textContent = 'error';
     $('redisStatus').textContent = 'error';
   }
 }
@@ -82,7 +82,7 @@ async function loadTasks() {
     const { data, source } = await apiFetch(url);
     lastSource = source;
     $('cacheSource').textContent = source;
-    $('apiSource').textContent   = `source: ${source}`;
+    $('apiSource').textContent = `source: ${source}`;
 
     if (!data.length) {
       list.innerHTML = `<div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-text">No tasks found. Create one!</div></div>`;
@@ -114,7 +114,7 @@ async function loadTasks() {
 }
 
 function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /* ── Create Task ─────────────────────────────────────────────────────────── */
@@ -134,7 +134,7 @@ $('taskForm').addEventListener('submit', async (e) => {
       body: JSON.stringify({
         title,
         description: $('taskDesc').value.trim(),
-        status:   $('taskStatus').value,
+        status: $('taskStatus').value,
         priority: $('taskPriority').value,
       }),
     });
@@ -166,12 +166,12 @@ async function deleteTask(id) {
 async function openEditModal(id) {
   try {
     const { data } = await apiFetch(`/api/tasks/${id}`);
-    $('editId').value          = data.id;
-    $('editTitle').value       = data.title;
-    $('editDesc').value        = data.description || '';
-    $('editStatus').value      = data.status;
-    $('editPriority').value    = data.priority;
-    $('editModal').hidden      = false;
+    $('editId').value = data.id;
+    $('editTitle').value = data.title;
+    $('editDesc').value = data.description || '';
+    $('editStatus').value = data.status;
+    $('editPriority').value = data.priority;
+    $('editModal').hidden = false;
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error');
   }
@@ -184,10 +184,10 @@ $('editForm').addEventListener('submit', async (e) => {
     await apiFetch(`/api/tasks/${id}`, {
       method: 'PUT',
       body: JSON.stringify({
-        title:       $('editTitle').value.trim(),
+        title: $('editTitle').value.trim(),
         description: $('editDesc').value.trim(),
-        status:      $('editStatus').value,
-        priority:    $('editPriority').value,
+        status: $('editStatus').value,
+        priority: $('editPriority').value,
       }),
     });
     $('editModal').hidden = true;

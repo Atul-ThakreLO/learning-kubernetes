@@ -1,0 +1,83 @@
+############################################################
+####################### Deployement ########################
+############################################################
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: taskflow-lg
+  labels:
+    name: frontend-deployment
+    app: taskflow
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      name: frontend
+      app: taskflow
+      tier: web
+  template:
+    metadata:
+      name: frontend
+      labels:
+        name: frontend
+        app: taskflow
+        tier: web
+    spec:
+      containers:
+        - name: frontend
+          image: taskflow-f:test  
+          imagePullPolicy: IfNotPresent
+          
+          ports:
+            - containerPort: 80
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+
+############################################################
+######################### Service ##########################
+############################################################
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: taskflow-lg
+  labels:
+    name: frontend-service
+    app: taskflow
+    tier: network
+spec:
+  type: NodePort
+  selector:
+    name: frontend
+    app: taskflow
+    tier: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+      protocol: TCP

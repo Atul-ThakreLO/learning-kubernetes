@@ -1,0 +1,43 @@
+############################################################
+######################## PV Create #########################
+############################################################
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+  labels:
+    app: taskflow
+    type: local
+spec:
+  capacity:
+    storage: 1Gi
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce  
+  persistentVolumeReclaimPolicy: Retain
+  hostPath: 
+    path: /mnt/devwork/data
+    type: DirectoryOrCreate
+    
+---
+
+############################################################
+######################## PV Claim ##########################
+############################################################
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pv-claim
+  namespace: taskflow-lg
+  labels: 
+    app: taskflow
+    type: claim
+spec: 
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 1Gi

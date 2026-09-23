@@ -1,0 +1,97 @@
+############################################################
+####################### Deployement ########################
+############################################################
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: taskflow-lg
+  labels:
+    name: backend-deployment
+    app: taskflow
+
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      name: backend
+      app: taskflow
+      tier: api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      name: backend
+      labels:
+        name: backend
+        app: taskflow
+        tier: api
+    spec:
+      containers:
+        - name: backend
+          image: taskflow-b:test
+          imagePullPolicy: IfNotPresent
+          
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: config
+            - secretRef:
+                name: taskflow-secret
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            failureThreshold: 30
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5 
+            periodSeconds: 10
+            failureThreshold: 3
+
+
+---
+
+############################################################
+######################### Service ##########################
+############################################################
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: taskflow-lg
+  labels:
+    name: backend-service
+    app: taskflow
+    tier: network
+spec:
+  type: ClusterIP
+  selector:
+    name: backend
+    app: taskflow
+    tier: api
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3001
+      protocol: TCP

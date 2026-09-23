@@ -21,7 +21,7 @@ const pgPool = new Pool({
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'taskdb',
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
+  password: process.env.DB_PASS || 'postgres',
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
@@ -197,6 +197,10 @@ app.get('/api/stats', async (req, res) => {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 async function start() {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Backend API running on port ${PORT}`);
+  });
+
   let dbRetries = 10;
   while (dbRetries > 0) {
     try {
@@ -222,10 +226,6 @@ async function start() {
       await new Promise(r => setTimeout(r, 3000));
     }
   }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Backend API running on port ${PORT}`);
-  });
 }
 
 start().catch(console.error);
