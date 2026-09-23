@@ -55,3 +55,7 @@ out/
 # Operating System specific files
 .DS_Store
 Thumbs.db
+
+
+WRITE_YOUR_OWN.md
+GUIDE.md
