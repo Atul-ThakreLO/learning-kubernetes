@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+  labels:
+    name: config
+    app: taskflow
+
+data:
+  # PostgreSQL config
+  DB_HOST: "postgres-svc"
+  DB_PORT: "5432"
+  DB_NAME: "taskdb"
+
+  # Redis config
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+
+  # Backend config
+  PORT: "3001"
+  NODE_ENV: "production"

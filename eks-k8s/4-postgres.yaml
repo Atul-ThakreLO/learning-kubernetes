@@ -1,0 +1,108 @@
+############################################################
+####################### Deployement ########################
+############################################################
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  labels: 
+    name: postgres-deployment
+    app: taskflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: postgres
+      tier: db
+      app: taskflow
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      name: postgres
+      labels:
+        name: postgres
+        tier: db
+        app: taskflow
+    spec:
+      containers:
+        - name: postgres-taskflow
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 5432
+              name: postgres
+
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: taskflow-secret
+                  key: DB_USER
+
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef: 
+                  name: config
+                  key: DB_NAME
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: taskflow-secret
+                  key: DB_PASS
+
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "taskdb"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 5
+
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: pv-claim
+
+
+---
+
+############################################################
+######################### Service ##########################
+############################################################
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-svc
+  labels:
+    name: postgres-svc
+    app: taskflow
+    tier: network
+spec:
+  type: ClusterIP
+  selector:
+    name: postgres
+    tier: db
+    app: taskflow
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+    
