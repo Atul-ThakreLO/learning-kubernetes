@@ -57,5 +57,6 @@ out/
 Thumbs.db
 
 
-./WRITE_YOUR_OWN.md
-./GUIDE.md
+WRITE_YOUR_OWN.md
+GUIDE.md
+flow.html
