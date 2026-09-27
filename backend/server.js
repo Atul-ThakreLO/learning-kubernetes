@@ -75,7 +75,7 @@ app.get('/health', async (req, res) => {
   } catch { checks.redis = 'error'; checks.status = 'degraded'; }
 
   checks.hostname = process.env.HOSTNAME || require('os').hostname();
-  checks.version  = '1.0.0';
+  checks.version = '1.0.0';
   res.json(checks);
 });
 

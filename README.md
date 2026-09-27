@@ -18,7 +18,7 @@
 │   ├── style.css
 │   ├── nginx.conf         # Reverse-proxy for /api/* → backend
 │   └── Dockerfile
-├── k8s/                   # Production-ready K8s manifests
+├── k8s/                   # Production-ready K8s manifests (Minikube / kind)
 │   ├── 00-namespace.yaml
 │   ├── 01-configmap.yaml
 │   ├── 02-secret.yaml
@@ -27,8 +27,17 @@
 │   ├── 05-redis.yaml
 │   ├── 06-backend.yaml
 │   └── 07-frontend.yaml
+├── eks-k8s/               # AWS EKS manifests (LoadBalancer service, public images)
+│   ├── 1-configmap.yaml
+│   ├── 2-secret.yaml
+│   ├── 3-postgres-pv.yaml
+│   ├── 4-postgres.yaml
+│   ├── 5-redis.yaml
+│   ├── 6-backend.yaml
+│   └── 7-frontend.yaml    # Service type: LoadBalancer → AWS ALB
 ├── k8s_prac/              # Stripped-down practice manifests (write your own)
 ├── Voting-app/            # Classic K8s example app manifests
+├── public/                # Screenshots from the live AWS EKS deployment
 ├── docker-compose.yaml    # Local dev stack (no K8s needed)
 ├── Makefile               # One-command workflow shortcuts
 ├── flow.html              # Interactive architecture flow diagram
@@ -133,6 +142,52 @@ make deploy
 make port-forward     # http://localhost:8080
 ```
 
+### Option D — AWS EKS (via eksctl)
+
+> **Prerequisites:** `eksctl`, `kubectl`, and `aws` CLI installed and configured with appropriate IAM permissions.
+
+```bash
+# 1. Create the EKS cluster with a managed node group
+eksctl create cluster \
+  --name taskflow \
+  --region ap-south-1 \
+  --nodegroup-name ng-d2c02d2a \
+  --node-type t3.micro \
+  --nodes 5 \
+  --nodes-min 4 \
+  --nodes-max 6 \
+  --managed
+
+# 2. Verify the cluster and node group
+eksctl get cluster
+eksctl get nodegroup --cluster taskflow
+
+# 3. Update kubeconfig to point kubectl at the new cluster
+aws eks update-kubeconfig --name taskflow --region ap-south-1
+
+# 4. Deploy all EKS manifests in order
+kubectl apply -f eks-k8s/1-configmap.yaml
+kubectl apply -f eks-k8s/2-secret.yaml
+kubectl apply -f eks-k8s/3-postgres-pv.yaml
+kubectl apply -f eks-k8s/4-postgres.yaml
+kubectl apply -f eks-k8s/5-redis.yaml
+kubectl apply -f eks-k8s/6-backend.yaml
+kubectl apply -f eks-k8s/7-frontend.yaml
+
+# 5. Watch pods come up
+kubectl get all
+
+# 6. Get the AWS Load Balancer URL (takes ~2 min to provision)
+kubectl get svc frontend-service
+# EXTERNAL-IP will be something like:
+# a2f272b5e0aeb4537a472c2a94b626c8-1356082159.ap-south-1.elb.amazonaws.com
+
+# 7. Tear down the cluster (avoids AWS charges)
+eksctl delete cluster --name taskflow --region ap-south-1
+```
+
+> **Key difference vs. local K8s:** The `eks-k8s/7-frontend.yaml` service uses `type: LoadBalancer` instead of `NodePort`. AWS automatically provisions an Elastic Load Balancer and assigns a public DNS hostname.
+
 ---
 
 ## 🛠️ Makefile Commands
@@ -184,13 +239,15 @@ make port-forward     # http://localhost:8080
 
 | Layer | Technology |
 |-------|-----------|
-| Container Orchestration | Kubernetes (Minikube / kind) |
+| Container Orchestration | Kubernetes (Minikube / kind / **AWS EKS**) |
+| Cluster Provisioning | **eksctl** (AWS EKS managed node groups) |
 | Local Dev | Docker Compose |
 | Backend | Node.js 20, Express 4, `pg`, `redis`, `helmet`, `morgan` |
 | Frontend | Vanilla HTML/CSS/JS, Nginx Alpine |
 | Database | PostgreSQL 15 Alpine |
 | Cache | Redis 7 Alpine |
-| Image Registry | Local (loaded directly into cluster) |
+| Image Registry | Local (Minikube/kind) / **Docker Hub** (EKS) |
+| Load Balancing | NodePort (local) / **AWS ELB** (EKS) |
 
 ---
 
@@ -238,9 +295,40 @@ The backend reads the following env vars (set via ConfigMap + Secret in K8s, or 
 ## 🧹 Teardown
 
 ```bash
-# Kubernetes
+# Kubernetes (Minikube / kind)
 make delete
 
 # Docker Compose
 make docker-down
+
+# AWS EKS (deletes cluster + all AWS resources)
+eksctl delete cluster --name taskflow --region ap-south-1
 ```
+
+---
+
+## ☁️ AWS EKS Deployment — Screenshots
+
+The TaskFlow app was deployed to a live EKS cluster (`ap-south-1` / Mumbai region) using `eksctl`. Below are screenshots from the deployment.
+
+### EKS Cluster — AWS Console
+> Cluster `taskflow` running Kubernetes v1.34 on EKS in `ap-south-1`.
+
+![EKS Cluster in AWS Console](./public/Awseks.png)
+
+### EC2 Worker Nodes
+> 5 × `t3.micro` worker nodes provisioned by the managed node group `ng-d2c02d2a`, spread across AZs `ap-south-1a`, `ap-south-1b`, and `ap-south-1c`.
+
+![EC2 Worker Nodes](./public/AwsInstance.png)
+
+### Terminal — `kubectl get all` + `eksctl` commands
+> All pods running, services showing the AWS ELB hostname as `EXTERNAL-IP` for `frontend-service` (type: `LoadBalancer`).
+
+![Terminal output](./public/Terminal.png)
+
+### Live App — TaskFlow via AWS Load Balancer
+> App accessible at the public ELB DNS. Backend pod name and DB/Redis connectivity confirmed in the Kubernetes Debug Info panel.
+
+![TaskFlow dashboard — empty state](./public/Dash.png)
+
+![TaskFlow dashboard — task created](./public/Dash2.png)
